@@ -17,7 +17,7 @@ lightning_logs/
 #Ignore Datasets
 *.zip
 *.pyc
-Datasets/
+
 Datasets/__pycache__/
 Datasets/CIFAR10/
 Datasets/FashionMNIST/
@@ -25,6 +25,7 @@ Datasets/sugarcane_damage_usa/
 Datasets/DeepShip/
 Datasets/DeepShip2/
 Datasets/VTUAD/
+Datasets/.ipynb_checkpoints/
 
 
 
