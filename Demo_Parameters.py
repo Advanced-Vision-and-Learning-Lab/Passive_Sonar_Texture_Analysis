@@ -208,11 +208,11 @@ def Parameters(args):
     
     #Location of texture datasets
     Data_dirs = {'DeepShip': './Datasets/DeepShip/'}
-    segment_length = 5
+    segment_length = 30
     sample_rate =32000
     
-    class_names = {'DeepShip':['background','Cargo', 'Passengership', 'Tanker', 'Tug']}
-    # class_names = {'DeepShip':['Cargo', 'Passengership', 'Tanker', 'Tug']}
+    # class_names = {'DeepShip':['background','Cargo', 'Passengership', 'Tanker', 'Tug']}
+    class_names = {'DeepShip':['Cargo', 'Passengership', 'Tanker', 'Tug']}
 
     
     #ResNet models to use for each dataset
@@ -231,7 +231,7 @@ def Parameters(args):
 
     
     #Number of classes in each dataset
-    num_classes = {'DeepShip': 5}
+    num_classes = {'DeepShip': 4}
     
     #Number of runs and/or splits for each dataset
     Splits = {'DeepShip':3}

@@ -1560,8 +1560,8 @@ class MobileNetV1(nn.Module):
         x = self.bn0(x)
         x = x.transpose(1, 3)
         
-        if self.training:
-            x = self.spec_augmenter(x)
+        # if self.training:
+        #     x = self.spec_augmenter(x)
 
         # Mixup on spectrogram
         if self.training and mixup_lambda is not None:

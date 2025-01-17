@@ -74,9 +74,9 @@ def initialize_model(mode,student_model,teacher_model, in_channels, out_channels
     
     #hop size 484 for 
     
-    feature_layer = Feature_Extraction_Layer(input_feature=input_feature, window_length=window_length,  window_size=1024, hop_size=120, 
+    feature_layer = Feature_Extraction_Layer(input_feature=input_feature, window_length=window_length,  window_size=1024, hop_size=320, 
         mel_bins=101, fmin=50, fmax=14000, classes_num=527,
-        hop_length=hop_length, sample_rate=sample_rate, RGB = RGB )
+        hop_length=12, sample_rate=sample_rate, RGB = RGB )
     
     ## Project
     # feature_layer2 = FeatureExtractionModel(sr=32000)    

@@ -61,7 +61,7 @@ class QCO_2d(nn.Module):
         sigma = 1/( self.level_num/2)
         quant = torch.exp(-(1/sigma**2) * ((cos_sim.unsqueeze(-1).unsqueeze(1) - q_levels.unsqueeze(-1).unsqueeze(-1))**2))
         
-        pdb.set_trace()
+        # pdb.set_trace()
         
         quant = quant.view([N, self.size_h, self.size_w, self.scale*self.scale, self.level_num]) 
 

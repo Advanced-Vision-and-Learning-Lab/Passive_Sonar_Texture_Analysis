@@ -31,7 +31,7 @@ class EDM(nn.Module):
         
         #Initialize edge filters
         self.ehd_layer = EHD_Layer(in_channels=in_channels, angle_res=45, normalize_kernel=True,
-                           dilation=1, threshold=0.1, window_size=(3, 3), stride=1,
+                           dilation=1, threshold=0.005, window_size=(5, 5), stride=1,
                            normalize_count=True, aggregation_type=self.fusion, kernel_size=3)
         
         #Define fusion type for edge responses
@@ -51,48 +51,55 @@ class EDM(nn.Module):
             raise RuntimeError('{} fusion method not implemented'.format(self.fusion))
         
  
-    def forward(self, x):    
-        #Compute laplacian pyramid
-        x = build_laplacian_pyramid(
+    # def forward(self, x):   
+    #     # pdb.set_trace()
+    #     #Compute laplacian pyramid
+    #     x = build_laplacian_pyramid(
+    #         x, max_level=self.max_level, border_type=self.border_type, align_corners=self.align_corners
+    #     )
+    #     # pdb.set_trace()
+
+    
+    #     # Compute EHD response for the first level (x[1])
+    #     features = self.ehd_layer(x[1])
+    #     spatial_size = features.shape[-2:]
+        
+    
+    #     # Initialize the concatenated features with the resized features for x[1]
+    #     features = [features] 
+    #     resize_feats = PadTo((spatial_size[0],spatial_size[1]),pad_mode='constant')
+    
+    #     # Iterate through the pyramid levels starting from x[2]
+    #     for feature in x[2:]:
+    #         # Compute edge response
+    #         feature = self.ehd_layer(feature)
+            
+    #         # Perform fusion (if needed)
+    #         feature = self.weighted_sum(feature)
+    
+    #         # Resize feature to the same size as the spatial size from x[2]
+    #         feature = nn.functional.interpolate(feature, size=spatial_size, 
+    #                                             mode="bilinear", align_corners=False)
+    #         feature = resize_feats(feature)
+    #         features.append(feature)
+    
+    #     # Concatenate all features along the channel dimension
+    #     features = torch.cat(features, dim=1)
+    #     # pdb.set_trace()
+
+    #     return features
+
+    def forward(self, x):
+        # Build Laplacian pyramid
+        pyramid = build_laplacian_pyramid(
             x, max_level=self.max_level, border_type=self.border_type, align_corners=self.align_corners
         )
-        pdb.set_trace()
-
-        # # Compute EHD response for the second pyramid level (x[2])
-        # spatial_features = self.ehd_layer(x[2])
-        
-        # # Get spatial size of second high pass output after EHD
-        # spatial_size = spatial_features.shape[-2:]
+       
+        # Apply edge detection to each level
+        edge_responses = [self.ehd_layer(level) for level in pyramid]
+        edge_responses = self.weighted_sum(edge_responses) 
+        return edge_responses  # Return edge-detected responses
     
-        # Compute EHD response for the first level (x[1])
-        features = self.ehd_layer(x[1])
-        spatial_size = features.shape[-2:]
-        
-    
-        # Initialize the concatenated features with the resized features for x[1]
-        features = [features] 
-        resize_feats = PadTo((spatial_size[0],spatial_size[1]),pad_mode='constant')
-    
-        # Iterate through the pyramid levels starting from x[2]
-        for feature in x[2:]:
-            # Compute edge response
-            feature = self.ehd_layer(feature)
-            
-            # Perform fusion (if needed)
-            feature = self.weighted_sum(feature)
-    
-            # Resize feature to the same size as the spatial size from x[2]
-            # feature = nn.functional.interpolate(feature, size=spatial_size, 
-            #                                     mode="bilinear", align_corners=False)
-            feature = resize_feats(feature)
-            features.append(feature)
-    
-        # Concatenate all features along the channel dimension
-        features = torch.cat(features, dim=1)
-
-        return features
-
-
 
 # # Example visuals
 
@@ -122,6 +129,7 @@ class EDM(nn.Module):
 
 
 ##neg logarithm
+# import matplotlib.pyplot as plt
 # pyramid_levels = [-np.log1p(x[i][0, 3].cpu().detach().numpy()) for i in range(4)]
 # fig, axes = plt.subplots(1, 4, figsize=(20, 5))
 
@@ -144,6 +152,35 @@ class EDM(nn.Module):
 
 # plt.tight_layout()
 # plt.show()
+
+##Edge responses
+# Extract the channels from the first batch
+# import matplotlib.pyplot as plt
+# test = features.squeeze(1)
+# pyramid_levels = [test[0, i, :, :].cpu().detach().numpy() for i in range(test.shape[1])]
+
+# fig, axes = plt.subplots(1, len(pyramid_levels), figsize=(20, 5))
+
+# # Increase the font size
+# font_size = 20
+
+# # Loop through each channel and plot
+# for i, (level, ax) in enumerate(zip(pyramid_levels, axes)):
+#     im = ax.imshow(level, cmap='coolwarm', aspect='auto', vmin=-0.2, vmax=0.8)
+#     ax.set_title(f'Channel {i}', fontsize=font_size)
+#     ax.set_xlabel('Frequency Bins', fontsize=font_size)
+#     ax.set_ylabel('Time Frames', fontsize=font_size)
+
+#     # Increase the tick label font size
+#     ax.tick_params(axis='both', labelsize=font_size)
+
+#     # Add a color bar with larger font size
+#     cbar = fig.colorbar(im, ax=ax)
+#     cbar.ax.tick_params(labelsize=font_size)
+
+# plt.tight_layout()
+# plt.show()
+
 
 
 ##coolwarm
