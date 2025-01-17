@@ -225,7 +225,7 @@ if __name__ == "__main__":
     print("EDM output shape:", edge_response[0].shape)
     
     
-## plot all 24
+## plot all 24 responses
 # Plot all 8 channels for each level
 # for level_idx, response in enumerate(edge_response):
 #     fig, axes = plt.subplots(2, 4, figsize=(20, 10))  # 2x4 grid for 8 channels
