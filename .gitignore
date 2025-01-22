@@ -26,7 +26,10 @@ Datasets/DeepShip/
 Datasets/DeepShip2/
 Datasets/VTUAD/
 Datasets/.ipynb_checkpoints/
-
+datasets_modulated/
+figures_modulated/
+Modulated_Data_Analysis/signals/
+Modulated_Data_Analysis/synthetic_dataset/
 
 
 

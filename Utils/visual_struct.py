@@ -22,7 +22,9 @@ import torch.nn as nn
 import torchaudio
 from EDM import EDM
 import matplotlib.pyplot as plt
-
+from DTIEM_Model_RBF import QCO_2d
+# Ensure CUDA is available
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 class Transpose(nn.Module):
     def __init__(self, dim0, dim1):
         super(Transpose, self).__init__()
@@ -91,7 +93,7 @@ class Feature_Extraction_Layer(nn.Module):
             sample_rate,
             n_mels=1024,  # 128 Mel bins
             win_length=8192,  # Window length of 8192
-            hop_length=780,  # Hop length of 1024
+            hop_length=1024,  # Hop length of 1024
             n_fft=8192,  # Set n_fft equal to win_length for STFT
             verbose=False,
             fmax=sample_rate / 4 
@@ -151,9 +153,9 @@ def normalize_response(response):
 
 if __name__ == "__main__":
     # Step 1: Load the audio signal
-    audio_path = "5_Cargo-Segment_1.wav"  # Replace with your audio file path
+    audio_path = "200959_Tug-Segment_1.wav"  # Replace with your audio file path
     waveform, sample_rate = torchaudio.load(audio_path)
-
+    waveform = waveform.to(device)
 
 ### 155: 1000x1024; 1024:157x1024
     # Step 2: Ensure the waveform has the correct shape
@@ -164,16 +166,12 @@ if __name__ == "__main__":
     original_n_mels = 1024
     original_hop_length = 1024
     original_window_size = 8192
-    # original_n_mels = 101
-    # original_hop_length = 320
-    # original_window_size = 1024
-    # Adjust feature parameters
     n_mels, hop_size, window_size = adjust_feature_params(
         original_n_mels, original_hop_length, original_window_size, max_level
     )
 
     # Print adjusted values for verification
-    print(f"Adjusted n_mels: {n_mels}, hop_size: {hop_size}, window_size: {window_size}")
+    # print(f"Adjusted n_mels: {n_mels}, hop_size: {hop_size}, window_size: {window_size}")
 
     #1sec = 312
     # Step 3: Extract the spectrogram using the desired feature type
@@ -190,19 +188,29 @@ if __name__ == "__main__":
         sample_rate=sample_rate,
         RGB=False
     )
+    feature_extractor = feature_extractor.to(device)
     # Pad the waveform to ensure compatibility
     waveform = pad_signal(waveform, hop_size, window_size, max_level)
     
     # Verify the padded signal length
     print(f"Padded signal length: {waveform.shape[-1]}")
     spectrogram = feature_extractor(waveform)
+    spectrogram_numpy = spectrogram.squeeze().cpu().detach().numpy()
+    
+    # Plot the spectrogram
+    plt.figure(figsize=(10, 8))
+    plt.imshow(spectrogram_numpy, aspect='auto', origin='lower', cmap='viridis')
+    plt.title("Spectrogram")
+    plt.colorbar(label="Amplitude")
+    plt.xlabel("Time Frames")
+    plt.ylabel("Frequency Bins")
+    plt.tight_layout()
+    plt.show()    
 
     # Step 4: Pass the spectrogram to the EDM module
     in_channels = spectrogram.shape[1]  # Number of channels from spectrogram
     edm = EDM(in_channels=in_channels, max_level=max_level, fusion='all')
     edge_response = edm(spectrogram)
-    # pdb.set_trace()
-
 
     # Aggregate responses by taking the max across the 8 channels
     aggregated_responses = [response[0].max(dim=0)[0].cpu().detach().numpy() for response in edge_response]
@@ -219,12 +227,30 @@ if __name__ == "__main__":
         plt.colorbar(im, ax=ax)
     plt.tight_layout()
     plt.show()
-    pdb.set_trace()
+    
+    stats_layer = QCO_2d(scale=1, level_num=4).to(device)
+    stats = stats_layer(spectrogram)
+
+    # pdb.set_trace()
     # Print shapes for verification
-    print("Spectrogram shape:", spectrogram.shape)
-    print("EDM output shape:", edge_response[0].shape)
+    # print("Spectrogram shape:", spectrogram.shape)
+    # print("EDM output shape:", edge_response[0].shape)
     
-    
+
+# Convert the spectrogram to a CPU numpy array for plotting
+# spectrogram_numpy = spectrogram.squeeze().cpu().detach().numpy()
+
+# # Plot the spectrogram
+# plt.figure(figsize=(10, 8))
+# plt.imshow(spectrogram_numpy, aspect='auto', origin='lower', cmap='inferno')
+# plt.title("Spectrogram")
+# plt.colorbar(label="Amplitude")
+# plt.xlabel("Time Frames")
+# plt.ylabel("Frequency Bins")
+# plt.tight_layout()
+# plt.show()    
+
+
 ## plot all 24 responses
 # Plot all 8 channels for each level
 # for level_idx, response in enumerate(edge_response):
@@ -238,3 +264,36 @@ if __name__ == "__main__":
 #         plt.colorbar(im, ax=ax)
 #     plt.tight_layout()
 #     plt.show()
+
+
+# import matplotlib.pyplot as plt
+
+# fig, ax = plt.subplots(4, 4, figsize=(12, 12))  # Adjust the size as needed
+
+# # Setting the font size for labels and titles
+# font_size = 12
+
+# # Loop through each subplot and visualize the data
+# for i in range(4):
+#     for j in range(4):
+#         # Compute the mean along the frequency axis (axis=1)
+#         data = test[i, j].detach().cpu().numpy()
+
+#         # Ensure the data is 2D by selecting an appropriate slice or using a mean
+#         # For example: keep it as a 2D array (e.g., no mean reduction on axes)
+
+#         # Store the imshow object in 'im' to later use for colorbar
+#         im = ax[i, j].imshow(data, aspect='auto', cmap='inferno')
+#         ax[i, j].set_title(f'Qn-Map ({i+1},{j+1})', fontsize=font_size)  # Add subplot title
+
+#         # Simplified axis labels
+#         ax[i, j].set_xlabel(f'Qn 1', fontsize=font_size)  # Set X-axis label
+#         ax[i, j].set_ylabel(f'Qn {j+1}', fontsize=font_size)  # Set Y-axis label
+
+#         ax[i, j].tick_params(axis='both', labelsize=font_size)  # Increase font size for ticks
+
+#         # Add a colorbar for each subplot
+#         fig.colorbar(im, ax=ax[i, j])
+
+# plt.tight_layout()
+# # plt.show()

@@ -72,7 +72,7 @@ class QCO_2d(nn.Module):
         quant_left = quant[:, :, :, :self.size_h, :self.size_w].unsqueeze(3) 
         quant_right = quant[:, :, :, 1:, 1:].unsqueeze(2) 
         quant = quant_left * quant_right
-        # pdb.set_trace()
+        pdb.set_trace()
 
         # pdb.set_trace()
         sta = quant.sum(-1).sum(-1)  
@@ -103,7 +103,7 @@ class QCO_2d(nn.Module):
 
 # # Setting the font size for labels and titles
 # font_size = 12
-
+# test = quant.squeeze(1)
 # # Loop through each subplot and visualize the data
 # for i in range(4):
 #     for j in range(4):
