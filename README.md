@@ -10,8 +10,6 @@ Jarin Ritu, Alexandra Van Dine and Joshua Peeples
 
 Note: If this code is used, cite it: Jarin Ritu, Alexandra Van Dine and Joshua Peeples. (2025, April 22) Peeples-Lab/Passive_Sonar_Texture_Analysis
 : Initial Release (Version v1.0). 
-[`Zendo`](https://doi.org/10.5281/zenodo.8184517).https://zenodo.org/record/8184517
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8184517.svg)](https://doi.org/10.5281/zenodo.8184517)
 
 
 
