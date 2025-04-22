@@ -30,10 +30,6 @@ The [`requirements.txt`](requirements.txt) file includes all the necessary packa
 
    ```pip install -r requirements.txt```
 
-Or, for a more convenient option, a pre-configured environment is available for download through the provided link. This environment comes with all the essential packages already installed, ensuring a hassle-free setup process.
-
-[`Download environment`](https://drive.google.com/file/d/1kASSpbMOtZCNF54oRXqUwxzxEGhF0YPg/view?usp=sharing)
-
 ## Demo
 
 To get started, please follow the instructions in the [Datasets](Datasets) folder to download the dataset.
@@ -41,7 +37,6 @@ Next, run [`demo.py`](demo.py) in Python IDE (e.g., Spyder) or command line to t
 To evaluate performance,
 run [`View_Results.py`](View_Results.py) (if results are saved out).
 
-[The results may vary from the paper as we updated the data loading and data normalization]
 
 ## Main Functions
 
@@ -76,29 +71,33 @@ The parameters can be set in the following script:
 https://github.com/Peeples-Lab/HLTDNN 
 
 └── root directory
-    ├── demo.py                           // Run this. Main demo file.
-    ├── Demo_Parameters.py                // Parameter file for the demo.
-    ├── Prepare_Data.py                   // Load dataset for the demo. 
-    ├── View_Results.py                   // Run this after the demo to view saved results. 
+    ├── demo.py                                   // Run this. Main demo file.
+    ├── Demo_Parameters.py                        // Parameter file for the demo.
+    ├── Prepare_Data.py                           // Load dataset for the demo. 
+    ├── View_Results.py                           // Run this after the demo to view saved results. 
     └── Datasets                
-        ├── Get_Preprocessed_Data.py      // Resample the audio data and generate segments for the dataset.
-        └── DeepShipSegments.py           // Create a custom dataset for DeepShip.
+        ├── Get_Preprocessed_Data.py              // Resample the audio data and generate segments for the dataset.
+        └── DeepShipSegments.py                   // Create a custom dataset for DeepShip/VTUAD/Synthetic
     └── Utils                     
-        ├── Class_information.py          // Class names for dataset for the results script.
-        ├── Compute_FDR.py                // Compute Fisher’s discriminant ratio.
-        ├── Confusion_mats.py             // Create and plot confusion matrix.
-        ├── Generate_Learning_Curves.py   // Generate learning curves for training and validation.
-        ├── Generate_TSNE_visual.py       // Generate TSNE visuals.
-        ├── Generate_Spatial_Dims.py      // Compute spatial dimensions for histogram layer models.
-        ├── Get_Optimizer.py              // Define a set of optimizers to choose from.
-        ├── Histogram_Model.py            // Load histogram model with TDNN (or any backbone network).
-        ├── Network_functions.py          // Contains functions to initialize, train, and test the model.
-        ├── RBFHistogramPooling.py        // Create histogram layer.
-        ├── Save_Results.py               // Save results from the demo script.
-        ├── pytorchtools.py               // Implement early stopping to terminate training based on validation metrics.
-        └── Feature_Extraction_Layer.py   // Extract and transform different features from the audio files.
-        └── TDNN.py                       // Baseline TDNN model.
-
+        ├── Class_information.py                  // Class names for dataset for the results script.
+        ├── Compute_FDR.py                        // Compute Fisher’s discriminant ratio.
+        ├── Confusion_mats.py                     // Create and plot confusion matrix.
+        ├── Generate_Learning_Curves.py           // Generate learning curves for training and validation.
+        ├── Generate_TSNE_visual.py               // Generate TSNE visuals.
+        ├── Generate_Spatial_Dims.py              // Compute spatial dimensions for histogram layer models.
+        ├── Get_Optimizer.py                      // Define a set of optimizers to choose from.
+        ├── Histogram_Model.py                    // Load histogram model with TDNN (or any backbone network).
+        ├── Network_functions.py                  // Contains functions to initialize, train, and test the model.
+        ├── RBFHistogramPooling.py                // Create histogram layer.
+        ├── Save_Results.py                       // Save results from the demo script.
+        ├── pytorchtools.py                       // Implement early stopping to terminate training based on validation metrics.
+        └── Feature_Extraction_Layer.py           // Extract and transform different features from the audio files.
+        └── TDNN.py                               // Baseline TDNN model.
+        └── synthetic_statistical_texture.py      // Create synthetic statistical texture dataset.
+        └── synthetic_structural_texture.py       // Create synthetic structural texture dataset.
+        └── synthetic_mixed_texture.py            // Create synthetic mixed statistical and structural textures dataset.
+        └── StaTS.py                              // Quantify statistical texture.
+        └── StrTS.py                              // Quantify structural texture.
 
 
 ```
@@ -111,7 +110,7 @@ This product is Copyright (c) 2025 J. Ritu, A. Dine and J. Peeples. All rights r
 
 ## <a name="CitingHist"></a>Citing Quantitative Measures for Passive Sonar Texture Analysis
 
-If you use the Passive Sonar Classification code, please cite the following reference using the following entry.
+If you use the Quantitative Measures for Passive Sonar Texture Analysis code, please cite the following reference using the following entry.
 
 **Plain Text:**
 
