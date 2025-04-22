@@ -1,6 +1,6 @@
 # Quantitative Measures for Passive Sonar Texture Analysiss:
 <p align="center">
-  <img src="Figures/Workflow.png" alt="Workflow Diagram">
+  <img src="Figure1_SyntheticVisuals.png" alt="Synthetic Texture Datasets">
 </p>
 
 
