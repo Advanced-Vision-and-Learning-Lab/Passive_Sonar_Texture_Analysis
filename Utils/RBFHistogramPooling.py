@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Sep 10 12:05:26 2018
-Generate histogram layer
-@author: jpeeples
+Created on Tue Apr 22 09:51:01 2024
+
+@author: jarin.ritu
 """
 
 import torch
@@ -85,7 +86,7 @@ class HistogramLayer(nn.Module):
         else:
             raise RuntimeError('Invalid dimension for histogram layer')
         
-    def forward(self,xx):   
+    def forward(self,xx):      
         #Pass through first convolution to learn bin centers
         xx = self.bin_centers_conv(xx)
         

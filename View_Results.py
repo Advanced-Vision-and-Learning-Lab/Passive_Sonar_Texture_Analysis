@@ -1,212 +1,277 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thursday April 25 22:32:00 2024
-Train and evaluate models for experiments on datasets
-@author: jpeeples, salimalkharsa
+Created on Tue Apr 22 09:51:01 2024
+
+@author: jarin.ritu
 """
-import argparse
-import os
-import glob
+
+## Python standard libraries
+from __future__ import print_function
+from sklearn.metrics import confusion_matrix
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report
+import pandas as pd
+import os
+from sklearn.metrics import matthews_corrcoef
+import pickle
+import argparse
+
+## PyTorch dependencies
 import torch
 import torch.nn as nn
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar, LearningRateFinder
-from lightning.pytorch.loggers import TensorBoardLogger
-from lightning import Trainer
-from lightning.pytorch.tuner import Tuner
-import optuna
-import pdb
+
+## Local external libraries
+from Utils.Generate_TSNE_visual import Generate_TSNE_visual
+from Utils.Class_information import Class_names
 from Demo_Parameters import Parameters
-from Utils.Save_Results import generate_filename
-from Utils.Lightning_Wrapper import Lightning_Wrapper, Lightning_Wrapper_KD
 from Utils.Network_functions import initialize_model
-from DeepShipDataModules import DeepShipDataModule
+from Prepare_Data import Prepare_DataLoaders
 from Utils.RBFHistogramPooling import HistogramLayer
-from Datasets.Get_preprocessed_data import process_data
-from Utils.Loss_function import SSTKAD_Loss
-from objective import objective
-from lightning.pytorch.tuner import Tuner
-from thop import profile
-from lightning.pytorch.loggers import TensorBoardLogger
-from Utils.Save_Results import generate_filename, aggregate_tensorboard_logs, aggregate_and_visualize_confusion_matrices
+from Utils.Confusion_mats import plot_confusion_matrix, plot_avg_confusion_matrix
+from Utils.Generate_Learning_Curves import Plot_Learning_Curves
+from Utils.Save_Results import get_file_location
 
-
-# from pytorch_lightning.tuner.tuning import LearningRateFinder
-
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-
-# Turn off plotting
 plt.ioff()
 
+def main(Params):
 
-def set_seeds(seed):
-    # pdb.set_trace()
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-def main(Params, optimize=False):
-    # if Params['HPRC']:
-    torch.set_float32_matmul_precision('medium')    
+    # Location of experimental results
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     fig_size = Params['fig_size']
     font_size = Params['font_size']
+    
+    # Set up number of runs and class/plots names
+    NumRuns = Params['Splits'][Params['Dataset']]
     plot_name = Params['Dataset'] + ' Test Confusion Matrix'
     avg_plot_name = Params['Dataset'] + ' Test Average Confusion Matrix'
-
+    class_names = Class_names[Params['Dataset']]
     
+    # Name of dataset
     Dataset = Params['Dataset']
-    student_model = Params['student_model'] 
-    teacher_model = Params['teacher_model']
+    
+    # Model(s) to be used
+    model_name = Params['Model_name']
+    
+    # Number of classes in dataset
     num_classes = Params['num_classes'][Dataset]
-    numRuns = Params['Splits'][Dataset]
+    
+    # Number of bins and input convolution feature maps after channel-wise pooling
     numBins = Params['numBins']
-    num_feature_maps = Params['out_channels'][student_model]
-    mode = Params['mode']
+    num_feature_maps = Params['out_channels'][model_name]
+    
+    # Local area of feature map after histogram layer
     feat_map_size = Params['feat_map_size']
-
-
-    print('Starting Experiments...')
-    best_model_path = ""
     
-    for split in range(0, 1):
-        set_seeds(split)
-
-        histogram_layer = HistogramLayer(
-            int(num_feature_maps / (feat_map_size * numBins)),
-            Params['kernel_size'][student_model],
-            num_bins=numBins, stride=Params['stride'],
-            normalize_count=Params['normalize_count'],
-            normalize_bins=Params['normalize_bins']
-        )
-
-        filename = generate_filename(Params, split)
-        logger = TensorBoardLogger(
-            save_dir=os.path.join(filename, "tb_logs"),
-            name="model_logs",
-        )
-        # logger = TensorBoardLogger(filename, default_hp_metric=False, version = 'Training')
-        
-        #Remove past events to conserve memory allocation
-        log_dir = '{}{}/{}'.format(logger.save_dir,logger.name,logger.version)
-        # print(f"Model path: {filename}")
-        files = glob.glob('{}/{}'.format(log_dir,'events.out.tfevents.*'))
-        for f in files:
-            os.remove(f)
-        print("Logger set up.")
-
-        
-        if Dataset == 'DeepShip':
-            data_dir = process_data(sample_rate=Params['sample_rate'], segment_length=Params['segment_length'])
-            data_module = DeepShipDataModule(
-                data_dir, Params['batch_size'],
-                Params['num_workers'], Params['pin_memory']
-            )
-        else:
-            raise ValueError(f'{Dataset} Dataset not found')
-            
-        print("Preparing data loaders...")
-        data_module.prepare_data()
-        data_module.setup("fit")
-        data_module.setup(stage='test')
-        # pdb.set_trace()
-        train_loader, val_loader, test_loader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
-
-
-        # print(f"Label distribution in test set: {label_counts}")
-        print("Dataloaders Initialized.")
-
-        model = initialize_model(
-            mode, student_model, teacher_model, 
-            Params['in_channels'][student_model], num_feature_maps,
-            use_pretrained=Params['use_pretrained'],
-            num_classes=num_classes,
-            feature_extract=Params['feature_extraction'],
-            channels=Params['TDNN_feats'][Dataset],
-            histogram=Params['histogram'],
-            histogram_layer=histogram_layer,
-            parallel=Params['parallel'],
-            add_bn=Params['add_bn'],
-            scale=Params['scale'],
-            feat_map_size=feat_map_size,
-            TDNN_feats=Params['TDNN_feats'][Dataset],
-            window_length=Params['window_length'][Dataset], 
-            hop_length=Params['hop_length'][Dataset],
-            input_feature=Params['feature'],
-            sample_rate=Params['sample_rate'],
-            level_num = Params['level_num'],
-            max_level = Params['max_level'],
-        )
-        print("Model Initialized.")
-
-        if args.mode == 'teacher':
-            sub_dir = generate_filename(Params, split)
-            model.remove_PANN_feature_extractor_teacher()
-            model_ft = Lightning_Wrapper(
-                nn.Sequential(model.feature_extractor, model.teacher), Params['num_classes'][Dataset], max_iter=len(train_loader),lr=Params['lr'],
-                label_names=Params['class_names'][Dataset], log_dir =filename,
-            )
-            
-        elif args.mode == 'distillation': 
-            sub_dir = generate_filename(Params, split)
-            model_ft = Lightning_Wrapper_KD(model, num_classes=Params['num_classes'][Dataset],  max_iter=len(train_loader),lr=Params['lr'],
-                                          log_dir = filename, label_names=Params['class_names'][Dataset],
-                                          Params=Params,criterion=SSTKAD_Loss(task_num = 4))        
-        elif args.mode == 'student':
-            sub_dir = generate_filename(Params, split)
-            model_ft = Lightning_Wrapper(
-                nn.Sequential(model.feature_extractor, model.student),
-                num_classes=num_classes,  
-                max_iter=len(train_loader), log_dir = filename, lr=Params['lr'],label_names=Params['class_names'][Dataset],
-            )
-        else:
-            raise RuntimeError(f'{mode} not implemented')
-            
-
-    print('Getting aggregated results...')
-    sub_dir = os.path.dirname(sub_dir.rstrip('/'))
+    # Initialize arrays for results
+    cm_stack = np.zeros((len(class_names), len(class_names)))
+    cm_stats = np.zeros((len(class_names), len(class_names), NumRuns))
+    FDR_scores = np.zeros((len(class_names), NumRuns))
+    log_FDR_scores = np.zeros((len(class_names), NumRuns))
+    accuracy = np.zeros(NumRuns)
+    MCC = np.zeros(NumRuns)
     
-    aggregation_folder = 'Aggregated_Results/'
-    aggregate_and_visualize_confusion_matrices(sub_dir, aggregation_folder, 
-                                               dataset=Dataset,label_names=Params['class_names'][Dataset],
-                                               figsize=(30,30), fontsize=32)
-    aggregate_tensorboard_logs(sub_dir, aggregation_folder,Dataset)
-    print('Aggregated results saved...')
+    for split in range(0, NumRuns):
+        
+       
+        #Find directory of results
+        sub_dir = get_file_location(Params,split)
+        
+        # Load training and testing files (Python)
+        train_pkl_file = open(sub_dir + 'train_dict.pkl', 'rb')
+        train_dict = pickle.load(train_pkl_file)
+        train_pkl_file.close()
+    
+        test_pkl_file = open(sub_dir + 'test_dict.pkl', 'rb')
+        test_dict = pickle.load(test_pkl_file)
+        test_pkl_file.close()
+        
+        # #Load model
+        histogram_layer = HistogramLayer(int(num_feature_maps / (feat_map_size * numBins)),
+                                          Params['kernel_size'][model_name],
+                                          num_bins=numBins, stride=Params['stride'],
+                                          normalize_count=Params['normalize_count'],
+                                          normalize_bins=Params['normalize_bins'])
+    
+        # Initialize the histogram model for this run
+        model, input_size, feature_extraction_layer = initialize_model(model_name, num_classes,
+                                              Params['in_channels'][model_name],
+                                              num_feature_maps,
+                                              feature_extract=Params['feature_extraction'],
+                                              histogram=Params['histogram'],
+                                              histogram_layer=histogram_layer,
+                                              parallel=Params['parallel'],
+                                              use_pretrained=Params['use_pretrained'],
+                                              add_bn=Params['add_bn'],
+                                              scale=Params['scale'],
+                                              feat_map_size=feat_map_size,
+                                              TDNN_feats=(Params['TDNN_feats'][Dataset]), input_feature = Params['feature'])
+    
+        # Set device to cpu or gpu (if available)
+        device_loc = torch.device(device)
+    
+        # Generate learning curves
+        Plot_Learning_Curves(train_dict['train_acc_track'],
+                             train_dict['train_error_track'],
+                             train_dict['val_acc_track'],
+                             train_dict['val_error_track'],
+                             train_dict['best_epoch'],
+                             sub_dir)
+    
+        # If parallelized, need to set change model
+        if Params['Parallelize']:
+            model = nn.DataParallel(model)
+    
+        # model.load_state_dict(train_dict['best_model_wts'])
+        print('Loading model...')
+        model.load_state_dict(torch.load(sub_dir + 'Best_Weights.pt', map_location=device_loc))
+        model = model.to(device)
+        feature_extraction_layer = feature_extraction_layer.to(device)
+
+    
+        dataloaders_dict = Prepare_DataLoaders(Params)
+    
+        if (Params['TSNE_visual']):
+            print("Initializing Datasets and Dataloaders...")
+    
+            dataloaders_dict = Prepare_DataLoaders(Params)
+            print('Creating TSNE Visual...')
+            
+            #Remove fully connected layer
+            if Params['Parallelize']:
+                try:
+                    model.module.fc = nn.Sequential()
+                except:
+                    model.module.classifier = nn.Sequential()
+            else:
+                try:
+                    model.fc = nn.Sequential()
+                except:
+                    model.classifier = nn.Sequential()
+            # Generate TSNE visual
+            FDR_scores[:, split], log_FDR_scores[:, split] = Generate_TSNE_visual(
+                dataloaders_dict,
+                model,feature_extraction_layer, sub_dir, device, class_names)
+            
+        # Create CM for testing data
+        cm = confusion_matrix(test_dict['GT'], test_dict['Predictions'])
+        
+        
+        # Create classification report
+        report = classification_report(test_dict['GT'], test_dict['Predictions'],
+                                       target_names=class_names, output_dict=True)
+
+        
+        # Convert to dataframe and save as .CSV file
+        df = pd.DataFrame(report).transpose()
+        
+        # Save to CSV
+        df.to_csv((sub_dir + 'Classification_Report.csv'))
+    
+        # Confusion Matrix
+        np.set_printoptions(precision=2)
+        fig4, ax4 = plt.subplots(figsize=(fig_size, fig_size))
+        plot_confusion_matrix(cm, classes=class_names, title=plot_name, ax=ax4,
+                              fontsize=font_size)
+        fig4.savefig((sub_dir + 'Confusion Matrix.png'), dpi=fig4.dpi)
+        plt.close(fig4)
+        cm_stack = cm + cm_stack
+        cm_stats[:, :, split] = cm
+    
+        # Get accuracy of each cm
+        accuracy[split] = 100 * sum(np.diagonal(cm)) / sum(sum(cm))
+        # Write to text file
+        with open((sub_dir + 'Accuracy.txt'), "w") as output:
+            output.write(str(accuracy[split]))
+    
+        # Compute Matthews correlation coefficient
+        MCC[split] = matthews_corrcoef(test_dict['GT'], test_dict['Predictions'])
+    
+        # Write to text file
+        with open((sub_dir + 'MCC.txt'), "w") as output:
+            output.write(str(MCC[split]))
+        directory = os.path.dirname(os.path.dirname(sub_dir)) + '/'
+    
+        print('**********Run ' + str(split + 1) + ' Finished**********')
+    
+    directory = os.path.dirname(os.path.dirname(sub_dir)) + '/'
+    np.set_printoptions(precision=2)
+    fig5, ax5 = plt.subplots(figsize=(fig_size, fig_size))
+    plot_avg_confusion_matrix(cm_stats, classes=class_names,
+                              title=avg_plot_name, ax=ax5, fontsize=font_size)
+    fig5.savefig((directory + 'Average Confusion Matrix.png'), dpi=fig5.dpi)
+    plt.close()
+    
+    # Write to text file
+    with open((directory + 'Overall_Accuracy.txt'), "w") as output:
+        output.write('Average accuracy: ' + str(np.mean(accuracy)) + ' Std: ' + str(np.std(accuracy)))
+    
+    # Write to text file
+    with open((directory + 'Overall_MCC.txt'), "w") as output:
+        output.write('Average MCC: ' + str(np.mean(MCC)) + ' Std: ' + str(np.std(MCC)))
+    
+    # Write to text file
+    with open((directory + 'testing_Overall_FDR.txt'), "w") as output:
+        output.write('Average FDR: ' + str(np.mean(FDR_scores, axis=1))
+                     + ' Std: ' + str(np.std(FDR_scores, axis=1)))
+    with open((directory + 'test_Overall_Log_FDR.txt'), "w") as output:
+        output.write('Average FDR: ' + str(np.mean(log_FDR_scores, axis=1))
+                     + ' Std: ' + str(np.std(log_FDR_scores, axis=1)))
+    
+    # Write list of accuracies and MCC for analysis
+    np.savetxt((directory + 'List_Accuracy.txt'), accuracy.reshape(-1, 1), fmt='%.2f')
+    np.savetxt((directory + 'List_MCC.txt'), MCC.reshape(-1, 1), fmt='%.2f')
+    
+    np.savetxt((directory + 'test_List_FDR_scores.txt'), FDR_scores, fmt='%.2E')
+    np.savetxt((directory + 'test_List_log_FDR_scores.txt'), log_FDR_scores, fmt='%.2f')
+    plt.close("all")
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Run histogram experiments for dataset')
-    parser.add_argument('--save_results', default=True, action=argparse.BooleanOptionalAction, help='Save results of experiments (default: True)')
-    parser.add_argument('--folder', type=str, default='Saved_Models/VT_4k/', help='Location to save models')
-    parser.add_argument('--student_model', type=str, default='TDNN', help='Select baseline model architecture')
-    parser.add_argument('--teacher_model', type=str, default='MobileNetV1', help='Select baseline model architecture')
-    parser.add_argument('--histogram', default=True, action=argparse.BooleanOptionalAction, help='Flag to use histogram model or baseline global average pooling (GAP), --no-histogram (GAP) or --histogram')
-    parser.add_argument('--data_selection', type=int, default=0, help='Dataset selection: See Demo_Parameters for full list of datasets')
-    parser.add_argument('-numBins', type=int, default=16, help='Number of bins for histogram layer. Recommended values are 4, 8 and 16. (default: 16)')
-    parser.add_argument('--feature_extraction', default=False, action=argparse.BooleanOptionalAction, help='Flag for feature extraction. False, train whole model. True, only update fully connected and histogram layers parameters (default: True)')
-    parser.add_argument('--use_pretrained', default=True, action=argparse.BooleanOptionalAction, help='Flag to use pretrained model from ImageNet or train from scratch (default: True)')
-    parser.add_argument('--train_batch_size', type=int, default=32, help='input batch size for training (default: 128)')
-    parser.add_argument('--val_batch_size', type=int, default=32, help='input batch size for validation (default: 512)')
-    parser.add_argument('--test_batch_size', type=int, default=32, help='input batch size for testing (default: 256)')
-    parser.add_argument('--num_epochs', type=int, default=1, help='Number of epochs to train each model for (default: 50)')
-    parser.add_argument('--resize_size', type=int, default=256, help='Resize the image before center crop. (default: 256)')
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate (default: 0.001)')
-    parser.add_argument('--use-cuda', default=True, action=argparse.BooleanOptionalAction, help='enables CUDA training')
-    parser.add_argument('--audio_feature', type=str, default='Log_Mel_Spectrogram', help='Audio feature for extraction')
-    parser.add_argument('--optimizer', type=str, default='AdamW', help='Select optimizer')
-    parser.add_argument('--ablation', type=str, default='True', help='Select ablation study to be true or false')
-    parser.add_argument('--patience', type=int, default=50, help='Number of epochs to train each model for (default: 50)')
-    parser.add_argument('--level_num', type=int, default=4, help='Number of quantization level for the stat module(default: 8)')
-    parser.add_argument('--max_level', type=int, default=3, help='Number of decomposition level for the struct module(default: 3)')
-    parser.add_argument('--temperature', type=float, default=2.0, help='Temperature for knowledge distillation')
-    parser.add_argument('--alpha', type=float, default=0.5, help='Alpha for knowledge distillation')
-    parser.add_argument('--mode', type=str, choices=['distillation','student', 'teacher'], default='distillation', help='Mode to run the script in: student, teacher, distillation (default: distillation)')
-    parser.add_argument('--HPRC', default=False, action=argparse.BooleanOptionalAction,
-                    help='Flag to run on HPRC (default: False)')
+    parser.add_argument('--save_results', default=True, action=argparse.BooleanOptionalAction,
+                        help='Save results of experiments(default: True)')
+    parser.add_argument('--folder', type=str, default='Saved_Models/test',
+                        help='Location to save models')
+    parser.add_argument('--model', type=str, default='TDNN',
+                        help='Select baseline model architecture')
+    parser.add_argument('--histogram', default=True, action=argparse.BooleanOptionalAction,
+                        help='Flag to use histogram model or baseline global average pooling (GAP), --no-histogram (GAP) or --histogram')
+    parser.add_argument('--data_selection', type=int, default=0,
+                        help='Dataset selection: See Demo_Parameters for full list of datasets')
+    parser.add_argument('-numBins', type=int, default=16,
+                        help='Number of bins for histogram layer. Recommended values are 4, 8 and 16. (default: 16)')
+    parser.add_argument('--feature_extraction', default=False, action=argparse.BooleanOptionalAction,
+                        help='Flag for feature extraction. False, train whole model. True, only update fully connected and histogram layers parameters (default: True)')
+    parser.add_argument('--use_pretrained', default=True, action=argparse.BooleanOptionalAction,
+                        help='Flag to use pretrained model from ImageNet or train from scratch (default: True)')
+    parser.add_argument('--train_batch_size', type=int, default=64,
+                        help='input batch size for training (default: 128)')
+    parser.add_argument('--val_batch_size', type=int, default=128,
+                        help='input batch size for validation (default: 512)')
+    parser.add_argument('--test_batch_size', type=int, default=128,
+                        help='input batch size for testing (default: 256)')
+    parser.add_argument('--num_epochs', type=int, default=50,
+                        help='Number of epochs to train each model for (default: 50)')
+    parser.add_argument('--resize_size', type=int, default=256,
+                        help='Resize the image before center crop. (default: 256)')
+    parser.add_argument('--lr', type=float, default=.001,
+                        help='learning rate (default: 0.01)')
+    parser.add_argument('--sigma', type=float, default=0.1,
+                        help='sigma for toy dataset (default: 0.1)')
+    parser.add_argument('--use-cuda', default=True, action=argparse.BooleanOptionalAction,
+                        help='enables CUDA training')
+    parser.add_argument('--audio_feature', type=str, default='Log_Mel_Spectrogram',
+                        help='Audio feature for extraction')
+    parser.add_argument('--optimizer', type = str, default = 'Adagrad',
+                       help = 'Select optimizer')
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
     args = parse_args()
+    use_cuda = args.use_cuda and torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
     params = Parameters(args)
     main(params)
+

@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 """
 Created on Tue Mar 14 20:27:21 2023
@@ -8,15 +7,12 @@ Baseline TDNN model
 
 import torch
 import torch.nn as nn
-#from Utils.CDM_DBF import CustomCDMLayer
-from Utils.CDM_DBF import CustomCDMLayer
-from Utils.DTIEM_Model_RBF import QCO_2d
 import pdb
 #TBD: Create block of convolution, max pooling, and non-linearity
 class TDNN(nn.Module):
     
     def __init__(self, in_channels, stride=1, dilation=1, batch_norm=True,
-                     num_class=4, output_len=1, drop_p=0.5, subband_level=2, device=None):
+                num_class = 4, output_len = 1, drop_p = .1):
         '''
         Baseline TDNN model
        
@@ -57,20 +53,12 @@ class TDNN(nn.Module):
         else:
             self.dropout = nn.Sequential()
             
-        #Additional custom layers
-        self.custom_cdm_layer = CustomCDMLayer(subband_level=subband_level, num_classes=num_class, in_channels=16)
-
-        self.custom_ditm_layer = QCO_2d(scale=1, level_num=8, out_chan= 144)
-        self.custom_cdm_layer.to(device)
-        self.custom_ditm_layer.to(device)
-
         #Define classifier (fully connected layer)
         #Do not apply sigmoid, cross-entropy takes raw logits
         self.fc = nn.Linear(self.conv5.out_channels*self.output_len, num_class)
-         
+    
     def forward(self, x):
-        pdb.set_trace()
-
+        # pdb.set_trace()
         '''
         input: size (batch, channels, audio_feature_x, audio_feature_y)
         output: size (batch, num_class)
@@ -84,9 +72,7 @@ class TDNN(nn.Module):
         x = self.conv2(x)
         x = self.nonlinearity(x)
         x = self.maxpool2(x)
-        x_cdm = self.custom_cdm_layer(x)
-        x_dtiem = self.custom_ditm_layer(x)
-
+        
         x = self.conv3(x)
         x = self.nonlinearity(x)
         x = self.maxpool3(x)
@@ -108,8 +94,5 @@ class TDNN(nn.Module):
         
         #Get classifier outputs for classes
         x = self.fc(x)
-        #pdb.set_trace()
        
-        return x_dtiem, x_cdm, x
-        # return x
- 
+        return x

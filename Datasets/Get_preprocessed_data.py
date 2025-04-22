@@ -1,131 +1,17 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 23 17:14:01 2023
+Define optimizer for training model
+@author: jarin.ritu
+"""
+
 import os
 import librosa
 import soundfile as sf
 import math
-import pdb
-import math
-import shutil
 
-
-
-# def Generate_Segments(dataset_dir, segments_dir, target_sr=32000, segment_length=3):
-#     '''
-#     dataset_dir: Directory containing DeepShip data folder
-#     segments_dir: Directory to save segments
-#     target_sr: Desired sampling rate in Hz
-#     segment_length: Desired segment length in seconds
-#     '''
-#     ship_type = ['Cargo', 'Passengership', 'Tanker', 'Tug']
-
-#     for ship in ship_type:
-#         folder_path = os.path.join(dataset_dir, ship)
-#         segments_path = os.path.join(segments_dir, ship)
-        
-#         # Check if the folder path exists
-#         if not os.path.exists(folder_path):
-#             print(f"Folder not found: {folder_path}")
-#             continue
-
-#         for subfolder_name in os.listdir(folder_path):
-#             subfolder_path = os.path.join(folder_path, subfolder_name)
-
-#             if not os.path.isdir(subfolder_path):
-#                 continue
-
-#             for file_name in os.listdir(subfolder_path):
-#                 if file_name.endswith('.wav'):
-#                     file_path = os.path.join(subfolder_path, file_name)
-#                     audio, sr = librosa.load(file_path, sr=None)
-#                     audio_resampled = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
-
-#                     duration = len(audio_resampled)
-#                     segment_duration = target_sr * segment_length
-#                     number = math.ceil(duration / segment_duration)
-                    
-#                     for i in range(number):
-#                         start_i = int(i * segment_duration)
-#                         end_i = int(start_i + segment_duration)
-#                         if end_i > duration:
-#                             end_i = duration
-#                         output_music = audio_resampled[start_i:end_i]
-#                         if end_i - start_i == segment_duration:
-#                             segment_file_path = os.path.join(
-#                                 segments_path,
-#                                 subfolder_name,
-#                                 f'{os.path.splitext(file_name)[0]}_{ship}-Segment_{i + 1}.wav'
-#                             )
-#                             os.makedirs(os.path.dirname(segment_file_path), exist_ok=True)
-#                             sf.write(segment_file_path, output_music, samplerate=target_sr)
-
-
-# def organize_segments(segments_dir, split_file_path):
-#     # Directories for each split
-#     train_dir = os.path.join(segments_dir, 'train')
-#     val_dir = os.path.join(segments_dir, 'val')
-#     test_dir = os.path.join(segments_dir, 'test')
-#     os.makedirs(train_dir, exist_ok=True)
-#     os.makedirs(val_dir, exist_ok=True)
-#     os.makedirs(test_dir, exist_ok=True)
-
-#     with open(split_file_path, 'r') as file:
-#         current_split = None
-#         for line in file:
-#             line = line.strip()
-
-#             if 'Train indices and paths:' in line:
-#                 current_split = 'train'
-#             elif 'Validation indices and paths:' in line:
-#                 current_split = 'val'
-#             elif 'Test indices and paths:' in line:
-#                 current_split = 'test'
-#             elif line:
-#                 # Extract the relative path directly from the .txt file
-#                 relative_path = line.split(': ', 1)[1]
-#                 file_name = os.path.basename(relative_path)
-
-#                 # Determine target directory based on split type
-#                 if current_split == 'train':
-#                     target_dir = os.path.join(train_dir, os.path.dirname(relative_path.replace(segments_dir, "")))
-#                 elif current_split == 'val':
-#                     target_dir = os.path.join(val_dir, os.path.dirname(relative_path.replace(segments_dir, "")))
-#                 elif current_split == 'test':
-#                     target_dir = os.path.join(test_dir, os.path.dirname(relative_path.replace(segments_dir, "")))
-
-#                 # Make the target directory if it does not exist
-#                 os.makedirs(target_dir, exist_ok=True)
-
-#                 # Construct the source path directly from the relative path
-#                 source_path = os.path.join(relative_path)
-#                 destination_path = os.path.join(target_dir, file_name)
-
-#                 # Move the file if it exists, and print status messages
-#                 if os.path.exists(source_path):
-#                     shutil.move(source_path, destination_path)
-#                     print(f"Moved {source_path} to {destination_path}")
-#                 else:
-#                     print(f"File not found: {source_path}")
-
-
-# def process_data(data_dir='./Datasets/DeepShip/', sample_rate=32000, segment_length=3, split_file_path='split_indices.txt'):
-#     segments_dir = '{}Segments_5s_{}hz/'.format(data_dir, sample_rate)
-
-#     if not os.path.exists(segments_dir):
-#         os.makedirs(segments_dir)
-#         print(f"Segments folder is creating at {segments_dir}")
-#         Generate_Segments(data_dir, segments_dir, target_sr=sample_rate, segment_length=segment_length)
-#     else:
-#         print("Segments folder already exists. Skipping segment generation.")
-
-#     # organize_segments(segments_dir, split_file_path)
-#     # print("Data has been organized into train, val, and test folders.")
-#     return segments_dir
-
-# if __name__ == "__main__":
-#     process_data()
-
-
-## SSATKD Paper
-def Generate_Segments(dataset_dir, segments_dir, target_sr=32000, segment_length=3):
+def Generate_Segments(dataset_dir, segments_dir, target_sr=16000, segment_length=3):
     '''
     dataset_dir: Directory containing DeepShip data folder
     segments_dir: Directory to save segments
@@ -157,7 +43,6 @@ def Generate_Segments(dataset_dir, segments_dir, target_sr=32000, segment_length
 
                     # Resample to the target sampling rate
                     audio_resampled = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
-                    # pdb.set_trace()
 
                     # Divide the resampled audio into segments and save them to a folder
                     duration = len(audio_resampled)
@@ -171,14 +56,13 @@ def Generate_Segments(dataset_dir, segments_dir, target_sr=32000, segment_length
                         output_music = audio_resampled[start_i:end_i]
                         if end_i - start_i == segment_duration:
                             segment_file_path = os.path.join(segments_path, subfolder_name,
-                                                              f'{os.path.splitext(file_name)[0]}_{ship}-Segment_{i + 1}.wav')
+                                                             f'{os.path.splitext(file_name)[0]}_{ship}-Segment_{i + 1}.wav')
                             os.makedirs(os.path.dirname(segment_file_path), exist_ok=True)
                             sf.write(segment_file_path, output_music, samplerate=target_sr)
 
 
 def process_data(data_dir='./Datasets/DeepShip/', sample_rate=None, segment_length=None):
-    # pdb.set_trace()
-    segments_dir = '{}Segments_5s_{}Hz/'.format(data_dir,sample_rate)
+    segments_dir = '{}Segments_{}s_{}hz/'.format(data_dir,segment_length,sample_rate)
 
     # Check if the 'Segments' folder already exists
     if not os.path.exists(segments_dir):
@@ -191,7 +75,7 @@ def process_data(data_dir='./Datasets/DeepShip/', sample_rate=None, segment_leng
                           segment_length=segment_length)
     else:
         print("Segments folder already exists. Skipping segment generation.")
-    return segments_dir
 
 if __name__ == "__main__":
     process_data()
+

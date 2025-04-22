@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Names and data directories for results script
-@author: jpeeples
+Created on Tue Apr 22 09:51:01 2024
+
+@author: jarin.ritu
 """
 import numpy as np
 

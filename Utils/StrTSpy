@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 31 23:44:32 2025
+
+@author: jarin.ritu
+"""
+
+import numpy as np
+import librosa
+import matplotlib.pyplot as plt
+import scipy.signal
+import scipy.spatial.distance
+import seaborn as sns
+
+class PeriodicityDetector:
+    def __init__(self, max_lag_seconds=None):
+        self.max_lag_seconds = max_lag_seconds  # Limit for searching periodic peaks
+
+    def compute_autocorrelation(self, signal):
+        """Compute normalized autocorrelation of the signal."""
+        signal = signal - np.mean(signal)
+        autocorr = np.correlate(signal, signal, mode='full')
+        autocorr = autocorr[autocorr.size // 2:]  # Keep only positive lags
+        autocorr /= autocorr[0]  # Normalize
+        return autocorr
+
+    def detect_periodicity(self, signal, sr, plot=False):
+        """Return the periodicity strength and estimated period (in seconds)."""
+        autocorr = self.compute_autocorrelation(signal)
+        duration = len(signal) / sr
+        if self.max_lag_seconds is None:
+            self.max_lag_seconds = min(2.0, max(0.25 * duration, 0.3))
+        
+        max_lag = int(self.max_lag_seconds * sr)
+
+        # Find peaks in the autocorrelation (excluding lag=0)
+        peaks, properties = scipy.signal.find_peaks(autocorr[1:max_lag], height=0)
+        if len(peaks) == 0:
+            print("No periodic peak found.")
+            return 0.0, None
+
+        # Get the most prominent peak
+        peak_lag = peaks[np.argmax(properties['peak_heights'])] + 1
+        peak_value = autocorr[peak_lag]
+
+        if plot:
+            lags = np.arange(len(autocorr)) / sr
+            plt.figure(figsize=(10, 4))
+            plt.plot(lags, autocorr, label="Autocorrelation")
+            plt.axvline(peak_lag / sr, color='r', linestyle='--', label=f"Peak Lag: {peak_lag/sr:.3f}s")
+            plt.title("Autocorrelation and Detected Periodicity")
+            plt.xlabel("Lag (seconds)")
+            plt.ylabel("Normalized Autocorr")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+
+        estimated_period = peak_lag / sr
+        return peak_value, estimated_period
+
+
+def interpret_periodicity_score(strength):
+    """Scale periodicity strength [0–1] to [0–5] and return a label."""
+    scaled_score = 5 * strength
+    scaled_score = max(0, min(5, scaled_score))  # Keep within 0–5
+
+    if 0 <= scaled_score < 1:
+        label = "Non-periodic"
+    elif 1 <= scaled_score < 2:
+        label = "Weakly periodic"
+    elif 2 <= scaled_score < 3:
+        label = "Moderately periodic"
+    elif 3 <= scaled_score < 4:
+        label = "Strongly periodic"
+    else:  # 4 <= scaled_score <= 5
+        label = "Highly periodic"
+
+    return scaled_score, label
+
+
+def plot_similarity_matrix(signal, sr, frame_size=1024, hop_length=512, metric='cosine'):
+    """
+    Compute and plot the self-similarity matrix of a signal.
+    
+    Parameters:
+    - signal: 1D audio signal
+    - sr: sampling rate
+    - frame_size: window length in samples
+    - hop_length: hop length in samples
+    - metric: distance metric for similarity (e.g., 'cosine', 'euclidean')
+    """
+    # Break signal into overlapping frames
+    frames = librosa.util.frame(signal, frame_length=frame_size, hop_length=hop_length).T
+
+    # Normalize each frame (helps cosine similarity)
+    frames = frames - np.mean(frames, axis=1, keepdims=True)
+    frames = frames / (np.linalg.norm(frames, axis=1, keepdims=True) + 1e-8)
+
+    # Compute pairwise similarity (1 - distance)
+    similarity = 1 - scipy.spatial.distance.cdist(frames, frames, metric=metric)
+
+    # Plot
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(similarity, cmap='viridis', square=True, cbar=True)
+    plt.title("Self-Similarity Matrix")
+    plt.xlabel("Frame Index")
+    plt.ylabel("Frame Index")
+    plt.tight_layout()
+    plt.show()
+
+
+# Example usage
+if __name__ == "__main__":
+    file_path = "3_Cargo-Segment_3.wav"  # or "pure_sine_2200Hz.wav"
+    signal, sr = librosa.load(file_path, sr=None)
+
+    # Plot similarity matrix for visualization
+    plot_similarity_matrix(signal, sr)
+    # Periodicity detection
+    detector = PeriodicityDetector()
+    strength, period = detector.detect_periodicity(signal, sr, plot=True)
+    scaled_score, label = interpret_periodicity_score(strength)
+
+    print(f"\nPeriodicity Strength: {strength:.4f}")
+    print(f"Estimated Period: {period:.4f} sec")
+    print(f"Scaled Score (0–5): {scaled_score:.2f} → {label}")
