@@ -113,12 +113,13 @@ This product is Copyright (c) 2025 J. Ritu, A. Dine and J. Peeples. All rights r
 
 If you use the Quantitative Measures for Passive Sonar Texture Analysis code, please cite the following reference using the following entry.
 
-**Plain Text:**
-
-J. Ritu, A. Dine and J. Peeples, "Quantitative Measures for Passive Sonar Texture Analysis," 2025 TBD
-
 **BibTex:**
 
 ```
-TBD
+@article{ritu2025quantitative,
+  title={Quantitative Measures for Passive Sonar Texture Analysis},
+  author={Ritu, Jarin and Van Dine, Alexandra and Peeples, Joshua},
+  journal={arXiv preprint arXiv:2504.14843},
+  year={2025}
+}
 ```
