@@ -1,4 +1,4 @@
-# Quantitative Measures for Passive Sonar Texture Analysiss:
+# Quantitative Measures for Passive Sonar Texture Analysis:
 <p align="center">
   <img src="Figure1_SyntheticVisuals.png" alt="Synthetic Texture Datasets">
 </p>
